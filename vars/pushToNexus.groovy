@@ -39,12 +39,9 @@ def call(Map config) {
                 passwordVariable: 'NEXUS_PASSWORD', 
                 usernameVariable: 'NEXUS_USERNAME')]) {
         sh """
-            # Set Nexus registry URL
-            NEXUS_REGISTRY="${registry}"
-            
             # Configure Docker for insecure registry
             mkdir -p ~/.docker
-            echo '{"auths":{"'${NEXUS_REGISTRY}'":{"auth":"'\$(echo -n ${NEXUS_USERNAME}:${NEXUS_PASSWORD} | base64 -w 0)'"}}, "insecure-registries": ["'${NEXUS_REGISTRY}'"] }' > ~/.docker/config.json
+            echo '{"auths":{"'${registry}'":{"auth":"'\$(echo -n ${NEXUS_USERNAME}:${NEXUS_PASSWORD} | base64 -w 0)'"}}, "insecure-registries": ["'${registry}'"] }' > ~/.docker/config.json
             
             # Set environment variables for Docker
             export DOCKER_TLS_VERIFY=0
@@ -53,7 +50,7 @@ def call(Map config) {
             docker tag ${sourceImage} ${targetImageName}
             
             # Login to Nexus registry
-            echo ${NEXUS_PASSWORD} | docker login -u ${NEXUS_USERNAME} --password-stdin ${NEXUS_REGISTRY}
+            echo ${NEXUS_PASSWORD} | docker login -u ${NEXUS_USERNAME} --password-stdin ${registry}
             
             # Push image to Nexus
             docker push ${targetImageName}
