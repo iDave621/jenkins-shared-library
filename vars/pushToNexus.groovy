@@ -1,4 +1,5 @@
 #!/usr/bin/env groovy
+// Updated version - fixed registry variable issues
 
 /**
  * Push a Docker image to Nexus repository
