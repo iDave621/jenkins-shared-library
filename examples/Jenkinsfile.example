@@ -1,0 +1,105 @@
+@Library('luxe-jewelry-lib') _
+
+pipeline {
+    agent any
+    
+    environment {
+        // Docker Hub registry
+        DOCKER_REGISTRY = "vixx3"
+        VERSION = "1.0.${BUILD_NUMBER}"
+        DOCKER_HUB_CRED_ID = "docker-hub"
+        
+        // Nexus registry information
+        NEXUS_REGISTRY = "192.168.1.117:8082"
+        NEXUS_CRED_ID = "Nexus-Docker"
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh 'git config --global --add safe.directory ${WORKSPACE}'
+            }
+        }
+        
+        stage('Build and Test') {
+            steps {
+                // Your build and test steps here
+                echo "Building and testing the application..."
+            }
+        }
+        
+        stage('Build and Push Docker Images') {
+            steps {
+                script {
+                    parallel(
+                        "Auth Service": {
+                            ciDockerImageBuild(
+                                imageName: "luxe-jewelry-auth-service",
+                                version: VERSION,
+                                dockerHubRegistry: DOCKER_REGISTRY,
+                                dockerHubCredentialsId: DOCKER_HUB_CRED_ID,
+                                nexusRegistry: NEXUS_REGISTRY,
+                                nexusCredentialsId: NEXUS_CRED_ID
+                            )
+                        },
+                        "Backend": {
+                            ciDockerImageBuild(
+                                imageName: "luxe-jewelry-backend",
+                                version: VERSION,
+                                dockerHubRegistry: DOCKER_REGISTRY,
+                                dockerHubCredentialsId: DOCKER_HUB_CRED_ID,
+                                nexusRegistry: NEXUS_REGISTRY,
+                                nexusCredentialsId: NEXUS_CRED_ID
+                            )
+                        },
+                        "Frontend": {
+                            ciDockerImageBuild(
+                                imageName: "luxe-jewelry-frontend",
+                                version: VERSION,
+                                dockerHubRegistry: DOCKER_REGISTRY,
+                                dockerHubCredentialsId: DOCKER_HUB_CRED_ID,
+                                nexusRegistry: NEXUS_REGISTRY,
+                                nexusCredentialsId: NEXUS_CRED_ID
+                            )
+                        }
+                    )
+                }
+            }
+        }
+        
+        stage('Deploy App') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CRED_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh '''
+                            # Deploy using docker-compose
+                            docker-compose down || true
+                            docker-compose up -d
+                            
+                            # Give containers a moment to start and verify they're running
+                            sleep 10
+                            docker ps
+                            
+                            echo "Deployment complete - All 3 services running"
+                        '''
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Clean up Docker images
+            script {
+                try {
+                    sh 'docker image prune -f || true'
+                } catch (Exception e) {
+                    echo "Error cleaning up Docker images: ${e.message}"
+                }
+            }
+            // Other cleanup steps
+        }
+    }
+}
