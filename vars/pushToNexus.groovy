@@ -1,5 +1,4 @@
 #!/usr/bin/env groovy
-// Updated version - fixed registry variable issues
 
 /**
  * Push a Docker image to Nexus repository
@@ -39,21 +38,33 @@ def call(Map config) {
     withCredentials([usernamePassword(credentialsId: credentialsId, 
                 passwordVariable: 'NEXUS_PASSWORD', 
                 usernameVariable: 'NEXUS_USERNAME')]) {
+        // Use double quotes for shell script to allow variable interpolation
         sh """
             # Configure Docker for insecure registry
             mkdir -p ~/.docker
-            echo '{"auths":{"'${registry}'":{"auth":"'\$(echo -n ${NEXUS_USERNAME}:${NEXUS_PASSWORD} | base64 -w 0)'"}}, "insecure-registries": ["'${registry}'"] }' > ~/.docker/config.json
             
-            # Set environment variables for Docker
+            # Create Docker config with registry login and insecure settings
+            cat > ~/.docker/config.json << EOL
+{
+  "auths": {
+    "${registry}": {
+      "auth": "\$(echo -n \${NEXUS_USERNAME}:\${NEXUS_PASSWORD} | base64 -w 0)"
+    }
+  },
+  "insecure-registries": ["${registry}"]
+}
+EOL
+            
+            # Set Docker to skip TLS verification
             export DOCKER_TLS_VERIFY=0
             
-            # Tag the image for Nexus
+            # Tag the image
             docker tag ${sourceImage} ${targetImageName}
             
-            # Login to Nexus registry
-            echo ${NEXUS_PASSWORD} | docker login -u ${NEXUS_USERNAME} --password-stdin ${registry}
+            # Login to registry
+            echo "\${NEXUS_PASSWORD}" | docker login -u "\${NEXUS_USERNAME}" --password-stdin ${registry} || true
             
-            # Push image to Nexus
+            # Push the image
             docker push ${targetImageName}
         """
     }
