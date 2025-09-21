@@ -38,22 +38,29 @@ def call(Map config) {
     withCredentials([usernamePassword(credentialsId: credentialsId, 
                 passwordVariable: 'NEXUS_PASSWORD', 
                 usernameVariable: 'NEXUS_USERNAME')]) {
-        // Use double quotes for shell script to allow variable interpolation
-        sh """
-            # Configure Docker daemon to accept insecure registry
-            echo '{ "insecure-registries" : ["${registry}"] }' | sudo tee /etc/docker/daemon.json || true
-            sudo systemctl restart docker || true
-            sleep 5
-            
+        // Use single quotes for the sh block to avoid Groovy string interpolation warning
+        sh '''
             # Tag the image
-            docker tag ${sourceImage} ${targetImageName}
+            docker tag ''' + sourceImage + ' ' + targetImageName + '''
             
-            # Login to registry (directly with credentials to avoid Docker config issues)
-            echo "\${NEXUS_PASSWORD}" | docker login --password-stdin -u "\${NEXUS_USERNAME}" ${registry} || true
+            # Create local Docker config file with insecure registry settings
+            mkdir -p ~/.docker
+            cat > ~/.docker/config.json << EOF
+{
+  "insecure-registries": ["''' + registry + '''"],
+  "experimental": "enabled"
+}
+EOF
             
-            # Push the image
-            docker push ${targetImageName}
-        """
+            # Set environment variable for Docker TLS
+            export DOCKER_TLS_VERIFY=0
+            
+            # Login to registry with explicit --insecure flag
+            echo "${NEXUS_PASSWORD}" | docker login --insecure -u "${NEXUS_USERNAME}" ''' + registry + ''' || true
+            
+            # Push image to Nexus
+            DOCKER_CLI_EXPERIMENTAL=enabled docker push ''' + targetImageName + '''
+        '''
     }
     
     return targetImageName
