@@ -40,29 +40,16 @@ def call(Map config) {
                 usernameVariable: 'NEXUS_USERNAME')]) {
         // Use double quotes for shell script to allow variable interpolation
         sh """
-            # Configure Docker for insecure registry
-            mkdir -p ~/.docker
-            
-            # Create Docker config with registry login and insecure settings
-            cat > ~/.docker/config.json << EOL
-{
-  "auths": {
-    "${registry}": {
-      "auth": "\$(echo -n \${NEXUS_USERNAME}:\${NEXUS_PASSWORD} | base64 -w 0)"
-    }
-  },
-  "insecure-registries": ["${registry}"]
-}
-EOL
-            
-            # Set Docker to skip TLS verification
-            export DOCKER_TLS_VERIFY=0
+            # Configure Docker daemon to accept insecure registry
+            echo '{ "insecure-registries" : ["${registry}"] }' | sudo tee /etc/docker/daemon.json || true
+            sudo systemctl restart docker || true
+            sleep 5
             
             # Tag the image
             docker tag ${sourceImage} ${targetImageName}
             
-            # Login to registry
-            echo "\${NEXUS_PASSWORD}" | docker login -u "\${NEXUS_USERNAME}" --password-stdin ${registry} || true
+            # Login to registry (directly with credentials to avoid Docker config issues)
+            echo "\${NEXUS_PASSWORD}" | docker login --password-stdin -u "\${NEXUS_USERNAME}" ${registry} || true
             
             # Push the image
             docker push ${targetImageName}
