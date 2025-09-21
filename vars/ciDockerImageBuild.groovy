@@ -58,9 +58,7 @@ def call(Map config) {
     // Push to Nexus if not skipped
     if (!skipNexus) {
         result.nexusImage = pushToNexus(
-            sourceImage: builtImage,
-            registry: config.nexusRegistry ?: "192.168.1.117:8082",
-            credentialsId: config.nexusCredentialsId ?: "Nexus-Docker"
+            sourceImage: builtImage
         )
     }
     
