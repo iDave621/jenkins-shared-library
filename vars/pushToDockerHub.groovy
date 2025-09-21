@@ -2,7 +2,7 @@
 
 def call(Map config) {
     def sourceImage = config.sourceImage
-    def credentialsId = config.credentialsId ?: "docker-hub"
+    String credentialsId = config.credentialsId ?: "docker-hub"
     def registry = config.registry ?: "vixx3"
     
     // Create target image name
@@ -23,8 +23,14 @@ def call(Map config) {
                 usernameVariable: 'DOCKER_USERNAME')]) {
         
         sh """
+            # Set Docker environment variables for better reliability
+            export DOCKER_TLS_VERIFY=0
+            
+            # Create docker config directory
+            mkdir -p ~/.docker
+            
             # Login to Docker Hub
-            echo \"${DOCKER_PASSWORD}\" | docker login -u \"${DOCKER_USERNAME}\" --password-stdin
+            echo "\${DOCKER_PASSWORD}" | docker login -u "\${DOCKER_USERNAME}" --password-stdin
             
             # Tag and push
             docker tag ${sourceImage} ${targetImage}
