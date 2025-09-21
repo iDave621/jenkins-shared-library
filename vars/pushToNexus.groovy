@@ -43,23 +43,22 @@ def call(Map config) {
             # Tag the image
             docker tag ''' + sourceImage + ' ' + targetImageName + '''
             
-            # Create local Docker config file with insecure registry settings
+            # Create Docker config with insecure registry settings
             mkdir -p ~/.docker
-            cat > ~/.docker/config.json << EOF
-{
+            echo '{
   "insecure-registries": ["''' + registry + '''"],
   "experimental": "enabled"
-}
-EOF
+}' > ~/.docker/config.json
             
-            # Set environment variable for Docker TLS
+            # Set Docker environment variables for insecure registry
             export DOCKER_TLS_VERIFY=0
+            export DOCKER_CLI_EXPERIMENTAL=enabled
             
-            # Login to registry with explicit --insecure flag
-            echo "${NEXUS_PASSWORD}" | docker login --insecure -u "${NEXUS_USERNAME}" ''' + registry + ''' || true
+            # Login to registry (--password-stdin for secure password passing)
+            echo "${NEXUS_PASSWORD}" | docker login --password-stdin -u "${NEXUS_USERNAME}" ''' + registry + ''' || true
             
             # Push image to Nexus
-            DOCKER_CLI_EXPERIMENTAL=enabled docker push ''' + targetImageName + '''
+            docker push ''' + targetImageName + '''
         '''
     }
     
