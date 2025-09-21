@@ -17,14 +17,20 @@ def call(Map config) {
                 passwordVariable: 'DOCKER_PASSWORD', 
                 usernameVariable: 'DOCKER_USERNAME')]) {
         
-        // Single-line command - no temporary file needed
-        sh '''
-            # Login to Docker Hub using credentials
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-            
-            # Push the image directly (it's already tagged properly)
-            docker push ''' + sourceImage + '''
-        '''
+        // Create a temporary script file to handle the Docker commands with proper environment
+        writeFile file: 'docker_hub_push.sh', text: '''
+#!/bin/bash
+set -e
+
+# Login to Docker Hub
+echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+# The actual image will be passed as an argument to this script
+docker push "$1"
+'''
+        
+        // Make script executable and run it with the image name as argument
+        sh "chmod +x docker_hub_push.sh && ./docker_hub_push.sh ${sourceImage} && rm docker_hub_push.sh"
     }
     
     return sourceImage
