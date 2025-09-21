@@ -4,7 +4,7 @@
  * Push a Docker image to Nexus repository
  * 
  * @param config Map of configuration options:
- *   - registry: Nexus registry URL with port (default: 192.168.1.117:8082)
+ *   - registry: Nexus registry URL with port (default: localhost:8081/repository/docker-nexus)
  *   - imageName: Name of the image to push without registry prefix
  *   - sourceImage: Full source image name with tag (alternative to imageName+version)
  *   - version: Image version/tag
@@ -13,7 +13,7 @@
  */
 def call(Map config) {
     // Set default values
-    def registry = config.registry ?: "192.168.1.117:8082"
+    def registry = config.registry ?: "localhost:8081/repository/docker-nexus"
     def credentialsId = config.credentialsId ?: "Nexus-Docker"
     
     // Handle different image specification methods
@@ -35,25 +35,26 @@ def call(Map config) {
 
     echo "Pushing ${sourceImage} to Nexus as ${targetImageName}"
     
-    // Use environment option for setting environment variables in a cleaner way
-    withEnv(["DOCKER_HOST=tcp://localhost:2375", "DOCKER_TLS_VERIFY=0"]) {
-        withCredentials([usernamePassword(credentialsId: credentialsId, 
-                    passwordVariable: 'NEXUS_PASSWORD', 
-                    usernameVariable: 'NEXUS_USERNAME')]) {
-            // Tag the image
-            sh "docker tag ${sourceImage} ${targetImageName}"
-            
-            // Create auth file manually rather than using docker login
-            def authString = sh(script: "echo -n '${NEXUS_USERNAME}:${NEXUS_PASSWORD}' | base64", returnStdout: true).trim()
-            
+    withCredentials([usernamePassword(credentialsId: credentialsId, 
+                passwordVariable: 'NEXUS_PASSWORD', 
+                usernameVariable: 'NEXUS_USERNAME')]) {
+        // Set environment variables for Docker to handle TLS issues
+        withEnv(["DOCKER_TLS_VERIFY=0", "DOCKER_CLI_EXPERIMENTAL=enabled"]) {
+            // Simple approach with direct Docker commands
             sh """
+                # Tag the image for Nexus
+                docker tag ${sourceImage} ${targetImageName}
+                
+                # Create insecure registry config
                 mkdir -p ~/.docker
-                echo '{"auths":{"${registry}":{"auth":"${authString}"}}, "insecure-registries":["${registry}"], "experimental":"enabled"}' > ~/.docker/config.json
-                cat ~/.docker/config.json
+                echo '{"insecure-registries":["localhost:8081"]}' > ~/.docker/config.json
+                
+                # Login to Nexus repository
+                echo "\${NEXUS_PASSWORD}" | docker login --password-stdin -u "\${NEXUS_USERNAME}" http://localhost:8081/repository/docker-nexus/
+                
+                # Push the image to Nexus
+                docker push ${targetImageName}
             """
-            
-            // Push directly with environment variables
-            sh "DOCKER_TLS_VERIFY=0 DOCKER_CLI_EXPERIMENTAL=enabled docker push ${targetImageName}"
         }
     }
     
