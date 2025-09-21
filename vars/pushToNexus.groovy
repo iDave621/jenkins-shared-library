@@ -35,31 +35,26 @@ def call(Map config) {
 
     echo "Pushing ${sourceImage} to Nexus as ${targetImageName}"
     
-    withCredentials([usernamePassword(credentialsId: credentialsId, 
-                passwordVariable: 'NEXUS_PASSWORD', 
-                usernameVariable: 'NEXUS_USERNAME')]) {
-        // Use single quotes for the sh block to avoid Groovy string interpolation warning
-        sh '''
-            # Tag the image
-            docker tag ''' + sourceImage + ' ' + targetImageName + '''
+    // Use environment option for setting environment variables in a cleaner way
+    withEnv(["DOCKER_HOST=tcp://localhost:2375", "DOCKER_TLS_VERIFY=0"]) {
+        withCredentials([usernamePassword(credentialsId: credentialsId, 
+                    passwordVariable: 'NEXUS_PASSWORD', 
+                    usernameVariable: 'NEXUS_USERNAME')]) {
+            // Tag the image
+            sh "docker tag ${sourceImage} ${targetImageName}"
             
-            # Create Docker config with insecure registry settings
-            mkdir -p ~/.docker
-            echo '{
-  "insecure-registries": ["''' + registry + '''"],
-  "experimental": "enabled"
-}' > ~/.docker/config.json
+            // Create auth file manually rather than using docker login
+            def authString = sh(script: "echo -n '${NEXUS_USERNAME}:${NEXUS_PASSWORD}' | base64", returnStdout: true).trim()
             
-            # Set Docker environment variables for insecure registry
-            export DOCKER_TLS_VERIFY=0
-            export DOCKER_CLI_EXPERIMENTAL=enabled
+            sh """
+                mkdir -p ~/.docker
+                echo '{"auths":{"${registry}":{"auth":"${authString}"}}, "insecure-registries":["${registry}"], "experimental":"enabled"}' > ~/.docker/config.json
+                cat ~/.docker/config.json
+            """
             
-            # Login to registry (--password-stdin for secure password passing)
-            echo "${NEXUS_PASSWORD}" | docker login --password-stdin -u "${NEXUS_USERNAME}" ''' + registry + ''' || true
-            
-            # Push image to Nexus
-            docker push ''' + targetImageName + '''
-        '''
+            // Push directly with environment variables
+            sh "DOCKER_TLS_VERIFY=0 DOCKER_CLI_EXPERIMENTAL=enabled docker push ${targetImageName}"
+        }
     }
     
     return targetImageName
