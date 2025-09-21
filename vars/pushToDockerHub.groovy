@@ -17,14 +17,22 @@ def call(Map config) {
                 passwordVariable: 'DOCKER_PASSWORD', 
                 usernameVariable: 'DOCKER_USERNAME')]) {
         
-        // Simple direct approach - both commands in one shell script
-        sh """
-            # Login to Docker Hub (using the Jenkins credentials)
-            echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
-            
-            # Push the image right after logging in
-            docker push ${sourceImage}
-        """
+        // Create a temporary script with proper escaping
+        def tempScript = "docker_push_${System.currentTimeMillis()}.sh"
+        
+        writeFile file: tempScript, text: '''
+#!/bin/bash
+set -e
+
+# Login to Docker Hub
+echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+'''
+
+        // Append the push command with the sourceImage variable
+        sh "echo \"docker push ${sourceImage}\" >> ${tempScript}"
+        
+        // Run the script and clean up
+        sh "chmod +x ${tempScript} && ./${tempScript} && rm ${tempScript}"
     }
     
     return sourceImage
