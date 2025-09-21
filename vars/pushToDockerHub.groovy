@@ -6,28 +6,25 @@ def call(Map config) {
     def credentialsId = config.credentialsId
     
     // Simple validation
-    if (!sourceImage || !credentialsId) {
-        error "sourceImage and credentialsId are required"
+    if (!sourceImage) {
+        error "sourceImage parameter is required"
     }
     
     echo "Pushing ${sourceImage} to Docker Hub"
     
-    // Use the credentials in a simple command
+    // Using withCredentials to get the Docker Hub password
     withCredentials([usernamePassword(credentialsId: credentialsId, 
                 passwordVariable: 'DOCKER_PASSWORD', 
                 usernameVariable: 'DOCKER_USERNAME')]) {
         
-        // Execute the Docker commands directly with proper environment variable handling
-        sh '''
-            # Login to Docker Hub using credentials
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        // Simple direct approach - both commands in one shell script
+        sh """
+            # Login to Docker Hub (using the Jenkins credentials)
+            echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
             
-            # Additional debugging
-            echo "Pushing image with direct command..."
-        '''
-        
-        // Execute the push command separately to avoid variable expansion issues
-        sh "docker push ${sourceImage}"
+            # Push the image right after logging in
+            docker push ${sourceImage}
+        """
     }
     
     return sourceImage
