@@ -2,7 +2,10 @@
 
 def call(Map config) {
     def sourceImage = config.sourceImage
-    def registry = "localhost:8081/repository/docker-nexus"
+    // Registry URL for push operations
+    def registry = "localhost:8081"
+    // Login URL with repository path
+    def loginUrl = "http://localhost:8081/repository/docker-nexus/"
     def credentialsId = config.credentialsId ?: "Nexus-Docker"
     
     // Create target image name
@@ -22,7 +25,7 @@ def call(Map config) {
         sh "docker tag ${sourceImage} ${targetImage}"
         
         // 2. Login to Nexus with proper URL format
-        sh "echo \${NEXUS_PASSWORD} | docker login http://localhost:8081/repository/docker-nexus/ -u \${NEXUS_USERNAME} --password-stdin"
+        sh "echo \${NEXUS_PASSWORD} | docker login ${loginUrl} -u \${NEXUS_USERNAME} --password-stdin"
         
         // 3. Push the image
         sh "docker push ${targetImage}"
