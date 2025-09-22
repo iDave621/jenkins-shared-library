@@ -2,17 +2,21 @@
 
 def call(Map config) {
     def sourceImage = config.sourceImage
-    // Registry URL for Docker operations
-    def registry = "localhost:8082"
-    // Login URL for Docker
-    def loginUrl = "http://localhost:8082"
+    // Registry URL with repository path for push operations
+    def registry = "localhost:8081/repository/docker-nexus"
+    // Login URL with repository path (include http:// and trailing slash)
+    def loginUrl = "http://localhost:8081/repository/docker-nexus/"
     def credentialsId = config.credentialsId ?: "Nexus-Docker"
     
     // Create target image name
     def parts = sourceImage.split(":")
     def name = parts[0].split("/").last() // Get just the image name without path
     def tag = parts.size() > 1 ? parts[1] : "latest"
+    // Combine registry with name, avoiding path duplication
     def targetImage = "${registry}/${name}:${tag}"
+    
+    // Fix any double slashes that might occur from path concatenation
+    targetImage = targetImage.replace("//", "/")
     
     echo "Pushing ${sourceImage} to Nexus as ${targetImage}"
     
