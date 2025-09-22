@@ -20,7 +20,7 @@ def call(Map config) {
         sh """
             # Create Docker config with insecure registry settings
             mkdir -p ~/.docker
-            echo '{"insecure-registries":["${registry}", "localhost:8081", "127.0.0.1:8081"]}' > ~/.docker/config.json
+            echo '{"insecure-registries":["${registry}", "localhost:8081", "localhost:8082", "localhost:8083", "127.0.0.1:8081"]}' > ~/.docker/config.json
             
             # Set Docker environment variables
             export DOCKER_TLS_VERIFY=0
