@@ -2,10 +2,10 @@
 
 def call(Map config) {
     def sourceImage = config.sourceImage
-    // Simple direct registry URL for Docker operations using dedicated port
+    // Direct hardcoded URLs for simplicity
+    def nexusUiUrl = "http://localhost:8081"
     def registry = "localhost:8082"
-    // Simple login URL (no http:// prefix needed)
-    def loginUrl = "localhost:8082"
+    def loginUrl = "http://localhost:8082"
     def credentialsId = config.credentialsId ?: "Nexus-Docker"
     
     // Create target image name
