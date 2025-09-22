@@ -17,35 +17,38 @@ def call(Map config = [:]) {
     def workspaceTestDir = "${env.WORKSPACE}/shared-lib-tests"
     
     try {
-        // Create results and test directories
+        // Get test file content as a string
+        def testFileContent = libraryResource("tests/${testFile}")
+        
+        // Run test setup and execution as a single shell script to maintain variable scope
         sh """
+            # Create proper directory structure
             mkdir -p ${resultPath}
             mkdir -p ${workspaceTestDir}
-        """
-        
-        // Write the test file content directly to workspace
-        writeFile file: "${workspaceTestDir}/${testFile}", text: libraryResource("tests/${testFile}")
-        
-        // Run the test
-        sh """
+            
             # Determine Python command
+            PYTHON_CMD="python3"
             if command -v python3 &> /dev/null; then
                 python3 -m pip install pytest requests --break-system-packages || true
-                TEST_PY="python3"
             elif command -v python &> /dev/null; then
                 python -m pip install pytest requests || true
-                TEST_PY="python"
+                PYTHON_CMD="python"
             else
                 echo "Python not found!"
                 exit 1
             fi
             
             # Report Python version
-            $TEST_PY --version
+            $PYTHON_CMD --version
+            
+            # Write test file to workspace
+            cat > "${workspaceTestDir}/${testFile}" << 'EOF'
+${testFileContent}
+EOF
             
             # Run the test with detailed output
             cd ${workspaceTestDir}
-            $TEST_PY -m pytest -v --junitxml=${env.WORKSPACE}/${resultPath}/shared-lib-pytest-results.xml ${testFile}
+            $PYTHON_CMD -m pytest -v --junitxml=${env.WORKSPACE}/${resultPath}/shared-lib-pytest-results.xml ${testFile}
         """
         
         // Report success
