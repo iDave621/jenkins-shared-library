@@ -2,10 +2,10 @@
 
 def call(Map config) {
     def sourceImage = config.sourceImage
-    // Registry URL with repository path for push operations
-    def registry = "localhost:8081/repository/docker-nexus"
-    // Login URL with repository path (include http:// and trailing slash)
-    def loginUrl = "http://localhost:8081/repository/docker-nexus/"
+    // Registry URL for Docker operations using V1 API port
+    def registry = "localhost:8082"
+    // Login URL for Docker (using Docker V1 API port)
+    def loginUrl = "http://localhost:8082"
     def credentialsId = config.credentialsId ?: "Nexus-Docker"
     
     // Create target image name
