@@ -11,6 +11,7 @@ def call(Map config) {
     // Create target image name
     def parts = sourceImage.split(":")
     def name = parts[0].split("/").last() // Get just the image name without path
+    // Use provided tag or fail if not provided
     def tag = parts.size() > 1 ? parts[1] : "latest"
     // Combine registry with name, avoiding path duplication
     def targetImage = "${registry}/${name}:${tag}"
