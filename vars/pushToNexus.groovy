@@ -29,11 +29,64 @@ def call(Map config) {
         // 1. Tag the image
         sh "docker tag ${sourceImage} ${targetImage}"
         
-        // 2. Login to Nexus with proper URL format
-        sh "echo \${NEXUS_PASSWORD} | docker login ${loginUrl} -u \${NEXUS_USERNAME} --password-stdin"
+        // 2. Ensure Docker is properly configured for Nexus and login
+        sh """
+            # Force logout first to clear any stale credentials
+            docker logout ${registry} || true
+            
+            # Configure Docker daemon for insecure registries
+            mkdir -p ~/.docker
+            cat > ~/.docker/config.json << EOF
+            {
+                "insecure-registries": ["${registry}"],
+                "auths": {
+                    "${registry}": {}
+                }
+            }
+            EOF
+            chmod 600 ~/.docker/config.json
+            
+            # Login with explicit credentials
+            echo \${NEXUS_PASSWORD} | docker login ${loginUrl} -u \${NEXUS_USERNAME} --password-stdin
+            
+            # Brief pause to ensure login is processed
+            sleep 2
+        """
         
-        // 3. Push the image
-        sh "docker push ${targetImage}"
+        // 3. Push the image with retry logic
+        def pushAttempts = 0
+        def maxAttempts = 3
+        def success = false
+        
+        while (!success && pushAttempts < maxAttempts) {
+            pushAttempts++
+            try {
+                // Echo attempt number
+                echo "Push attempt ${pushAttempts}/${maxAttempts} for ${targetImage}"
+                
+                // Try to push with increased timeout
+                sh """
+                    # Attempt to push with timeout
+                    timeout 120s docker push ${targetImage}
+                """
+                
+                // If we get here, push was successful
+                success = true
+                echo "Successfully pushed ${targetImage} on attempt ${pushAttempts}"
+            } catch (Exception e) {
+                if (pushAttempts >= maxAttempts) {
+                    echo "All ${maxAttempts} push attempts failed. Last error: ${e.message}"
+                    throw e
+                } else {
+                    echo "Push attempt ${pushAttempts} failed: ${e.message}. Retrying..."
+                    // Wait before retry with exponential backoff
+                    sleep(pushAttempts * 5)
+                    
+                    // Re-login before retry
+                    sh "echo \${NEXUS_PASSWORD} | docker login ${loginUrl} -u \${NEXUS_USERNAME} --password-stdin"
+                }
+            }
+        }
     }
     
     return targetImage
